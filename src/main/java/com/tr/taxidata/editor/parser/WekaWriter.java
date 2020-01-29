@@ -1,15 +1,25 @@
 package com.tr.taxidata.editor.parser;
 
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Vector;
 import java.util.stream.IntStream;
 
 public class WekaWriter {
     private List<Landmark> landmarks;
     private static final int MODULO_FACTOR = 10;
+    private Landmark closestLandmark;
 
-    public WekaWriter(List<Landmark> landmarks) {
+    public WekaWriter(List<Landmark> landmarks, Landmark closestLandmark) {
         this.landmarks = landmarks;
+        this.closestLandmark = closestLandmark;
     }
 
     public List<Landmark> getLandmarks() {
@@ -32,18 +42,30 @@ public class WekaWriter {
         stringBuilder.append(System.getProperty("line.separator"));
         stringBuilder.append("@DATA");
         stringBuilder.append(System.getProperty("line.separator"));
+        stringBuilder.append(this.closestLandmark.getLongitude()).append(", ").append(this.closestLandmark.getLatitude());
+        stringBuilder.append(System.getProperty("line.separator"));
+
         IntStream.range(0, this.landmarks.size()).forEach(index -> {
             if (index % MODULO_FACTOR == 0) {
                 stringBuilder.append(this.landmarks.get(index).getX()).append(", ").append(this.landmarks.get(index).getY());
                 stringBuilder.append(System.getProperty("line.separator"));
             }
         });
-        /*this.landmarks.forEach(landmark -> {
-            stringBuilder.append(landmark.getX()).append(", ").append(landmark.getY());
-            stringBuilder.append(System.getProperty("line.separator"));
-        });*/
         System.out.println(stringBuilder.toString());
         return stringBuilder.toString();
+    }
+
+    public void writeFile() throws IOException {
+        String path = WekaWriter.class.getClassLoader().getResource("resources").getPath();
+        File wkt = new File(path + "/deneme.arff");
+
+        if (wkt.exists()) wkt.delete();
+        wkt.createNewFile();
+
+        FileWriter wktstream = new FileWriter(wkt, true);
+        wktstream.append("deneme");
+
+        wktstream.close();
     }
 
     @Override
