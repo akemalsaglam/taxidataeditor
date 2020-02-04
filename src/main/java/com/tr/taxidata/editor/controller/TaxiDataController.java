@@ -51,6 +51,7 @@ public class TaxiDataController {
         System.out.println("transforming latitudes/longitudes to x,y coordinates...");
         List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
 
+        // TODO: we can calculate closest point by including all points
         System.out.println("finding closest point in map...");
         List<Landmark> cityLandmarks = CityReader.readCityWktAndGetLandmarks();
         Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
