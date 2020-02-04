@@ -4,6 +4,10 @@ import com.tr.taxidata.editor.model.TaxiData;
 import com.tr.taxidata.editor.model.TaxiDataCountDto;
 import com.tr.taxidata.editor.parser.*;
 import com.tr.taxidata.editor.service.TaxiDataService;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
@@ -61,9 +65,8 @@ public class TaxiDataController {
         return lineStringWriter.write();
     }
 
-    @GetMapping(path = "/{id}/monthly/{month}/linestring/download")
-    @ResponseBody
-    public String getMonthlyDataByTaxiIdLineStringDownload(@PathVariable("id") Long id, @PathVariable("month") int month, HttpServletResponse response) throws IOException {
+    @GetMapping(path = "/{id}/monthly/{month}/linestring/download", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public ResponseEntity<ByteArrayResource> getMonthlyDataByTaxiIdLineStringDownload(@PathVariable("id") Long id, @PathVariable("month") int month, HttpServletResponse response) throws IOException {
         System.out.println("fetching data from db...");
         List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
         List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
@@ -83,7 +86,14 @@ public class TaxiDataController {
         LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark);
         response.setContentType("text/plain");
         response.setCharacterEncoding("UTF-8");
-        return lineStringWriter.write();
+
+        byte[] data = lineStringWriter.write().getBytes();
+        ByteArrayResource resource = new ByteArrayResource(data);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + id + ".txt")
+                .contentType(MediaType.TEXT_PLAIN)
+                .contentLength(data.length)
+                .body(resource);
     }
 
     @GetMapping(path = "monthly/{month}/linestring/top")
@@ -110,7 +120,7 @@ public class TaxiDataController {
     }
 
     @GetMapping(path = "/{id}/monthly/{month}/arff")
-    public String getMonthlyDataByTaxiIdArff(@PathVariable("id") Long id, @PathVariable("month") int month) {
+    public String getMonthlyDataByTaxiIdArff(@PathVariable("id") Long id, @PathVariable("month") int month) throws IOException {
         System.out.println("fetching data from db...");
         List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
 
@@ -122,9 +132,44 @@ public class TaxiDataController {
         System.out.println("transforming latitudes/longitudes to x,y coordinates...");
         List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
 
+        System.out.println("finding closest point in map...");
+        List<Landmark> cityLandmarks = CityReader.readCityWktAndGetLandmarks();
+        Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
+
         System.out.println("writing weka results...");
-        WekaWriter wekaWriter = new WekaWriter(landmarks);
+        WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
         return wekaWriter.write();
+
     }
+
+    @GetMapping(path = "/{id}/monthly/{month}/arff/download")
+    public ResponseEntity<ByteArrayResource> getMonthlyDataByTaxiIdArffDownload(@PathVariable("id") Long id, @PathVariable("month") int month) throws IOException {
+        System.out.println("fetching data from db...");
+        List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
+
+        System.out.println("parsing linestrings...");
+        List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+        LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
+        lineStringParser.parse();
+
+        System.out.println("transforming latitudes/longitudes to x,y coordinates...");
+        List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
+
+        System.out.println("finding closest point in map...");
+        List<Landmark> cityLandmarks = CityReader.readCityWktAndGetLandmarks();
+        Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
+
+        System.out.println("writing weka results...");
+        WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
+
+        byte[] data = wekaWriter.write().getBytes();
+        ByteArrayResource resource = new ByteArrayResource(data);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + id + ".arff")
+                .contentType(MediaType.TEXT_PLAIN)
+                .contentLength(data.length)
+                .body(resource);
+    }
+
 
 }
