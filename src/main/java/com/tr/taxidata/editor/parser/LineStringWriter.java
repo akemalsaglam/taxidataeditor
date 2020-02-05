@@ -1,18 +1,23 @@
 package com.tr.taxidata.editor.parser;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 public class LineStringWriter {
 
     private List<Landmark> landmarks;
     private Landmark closestLandmark;
-    private static final int MODULO_FACTOR = 10;
+    private int moduloFactor;
 
     public LineStringWriter(List<Landmark> landmarks, Landmark closestLandmark) {
         this.landmarks = landmarks;
         this.closestLandmark = closestLandmark;
+    }
+
+    public LineStringWriter(List<Landmark> landmarks, Landmark closestLandmark, int moduloFactor) {
+        this.landmarks = landmarks;
+        this.closestLandmark = closestLandmark;
+        this.moduloFactor = moduloFactor;
     }
 
     public List<Landmark> getLandmarks() {
@@ -39,19 +44,16 @@ public class LineStringWriter {
         stringBuilder.append(this.closestLandmark.getLatitude());
         stringBuilder.append(", ");
 
-        AtomicInteger count = new AtomicInteger();
         IntStream.range(0, this.landmarks.size()).forEach(index -> {
-            if (index % MODULO_FACTOR == 0) {
+            if (moduloFactor == 0 || (index % moduloFactor == 0)) {
                 stringBuilder.append(this.landmarks.get(index).getX());
                 stringBuilder.append(" ");
                 stringBuilder.append(this.landmarks.get(index).getY());
                 if (index != this.landmarks.size() - 1) {
                     stringBuilder.append(", ");
                 }
-                count.getAndIncrement();
             }
         });
-        System.out.println(count.get());
         stringBuilder.append(")");
         return stringBuilder.toString();
     }
