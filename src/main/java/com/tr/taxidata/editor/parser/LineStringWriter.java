@@ -1,5 +1,6 @@
 package com.tr.taxidata.editor.parser;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -44,17 +45,26 @@ public class LineStringWriter {
         stringBuilder.append(this.closestLandmark.getLatitude());
         stringBuilder.append(", ");
 
+        List<Landmark> selectedLandmarks = new ArrayList<>();
+
         IntStream.range(0, this.landmarks.size()).forEach(index -> {
             if (moduloFactor == 0 || (index % moduloFactor == 0)) {
-                stringBuilder.append(this.landmarks.get(index).getX());
-                stringBuilder.append(" ");
-                stringBuilder.append(this.landmarks.get(index).getY());
-                if (index != this.landmarks.size() - 1) {
-                    stringBuilder.append(", ");
-                }
+                selectedLandmarks.add(this.landmarks.get(index));
+
             }
         });
+
+        IntStream.range(0, selectedLandmarks.size()).forEach(index -> {
+            stringBuilder.append(selectedLandmarks.get(index).getX());
+            stringBuilder.append(" ");
+            stringBuilder.append(selectedLandmarks.get(index).getY());
+            if (index != (selectedLandmarks.size() - 1)) {
+                stringBuilder.append(", ");
+            }
+        });
+
         stringBuilder.append(")");
+        System.out.println(stringBuilder.toString());
         return stringBuilder.toString();
     }
 

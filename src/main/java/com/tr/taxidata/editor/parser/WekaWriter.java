@@ -53,6 +53,20 @@ public class WekaWriter {
         return stringBuilder.toString();
     }
 
+    public StringBuilder getArffStringWithoutHeader() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(this.closestLandmark.getLongitude()).append(", ").append(this.closestLandmark.getLatitude());
+        stringBuilder.append(System.getProperty("line.separator"));
+
+        IntStream.range(0, this.landmarks.size()).forEach(index -> {
+            if (moduloFactor == 0 || (index % moduloFactor == 0)) {
+                stringBuilder.append(this.landmarks.get(index).getX()).append(", ").append(this.landmarks.get(index).getY());
+                stringBuilder.append(System.getProperty("line.separator"));
+            }
+        });
+        return stringBuilder;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -69,11 +69,11 @@ public class TaxiDataService {
         return taxiData;
     }
 
-    public List<TaxiDataCountDto> getMonthTopTaxis(int month) {
+    public List<TaxiDataCountDto> getMonthTopTaxisByLimit(int month, long limit) {
         List<Object[]> taxiData = new ArrayList<>();
         switch (month) {
             case 1:
-                taxiData = taxiDataRepository.getMonth1TopTaxis();
+                taxiData = taxiDataRepository.getMonth1TopTaxis(limit);
                 break;
             /*case 2:
                 taxiData = taxiDataRepository.getMonth2DataByTaxiId(id);
