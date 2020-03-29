@@ -6,6 +6,7 @@ import com.tr.taxidata.editor.model.TaxiDataCountDto;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,4 +52,14 @@ public interface TaxiDataRepository extends JpaRepository<TaxiData, Long> {
 
     @Query(value = "select btd.taxi_id as taxiId,count(*) as logCount from public.bursa_taxi_data_month1 btd group by btd.taxi_id order by logCount desc limit ?1", nativeQuery = true)
     List<Object[]> getMonth1TopTaxis(Long limit);
+
+    @Query(value = "select * from public.bursa_taxi_data_month1 tdmv " +
+            "where tdmv.taxi_id=?1 " +
+            "and tdmv.date>'2019-01-01 00:00:00' and tdmv.date<'2019-01-08 00:00:00' order by \"date\" asc", nativeQuery = true)
+    List<TaxiData> getMonth1Week1DataByTaxiId(Long taxiId);
+
+    @Query(value = "select * from public.bursa_taxi_data_month1 tdmv " +
+            "where tdmv.taxi_id=?1 " +
+            "and tdmv.date > ?2 and tdmv.date < ?3 order by \"date\" asc", nativeQuery = true)
+    List<TaxiData> getMonth1Week1DataByTaxiId(Long taxiId, Timestamp startDate, Timestamp endDate);
 }

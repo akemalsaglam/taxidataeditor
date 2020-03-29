@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -265,6 +266,63 @@ public class TaxiDataController {
 
             WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
             arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
+
+        })).join();
+
+        printSettingsByTaxi(topTaxis);
+        StringBuilder stringBuilder = getArffStringBuilder(arffStringWithoutHeader);
+        topTaxisLineStrings.put("all_arff",stringBuilder.toString().getBytes());
+        byte[] data = zipBytes(topTaxisLineStrings);
+        ByteArrayResource resource = new ByteArrayResource(data);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".zip")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .contentLength(data.length)
+                .body(resource);
+    }
+
+    @GetMapping(path = "monthly/{month}/week1/all/top/{limit}/download")
+    public ResponseEntity<ByteArrayResource> getMonthlyWeek1DataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
+        List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
+        ForkJoinPool forkJoinPool = new ForkJoinPool(20);
+        Map<String, byte[]> topTaxisLineStrings = new HashMap<>();
+        List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
+
+        forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
+            List<List<TaxiData>> taxiDataList = null;
+            try {
+                taxiDataList = taxiDataService.getMonthlyWeek1DataByTaxiIdAndMonth(taxi.getTaxiId(), month);
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+
+            AtomicInteger day= new AtomicInteger(1);
+            taxiDataList.forEach(taxiData->{
+                List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+
+                LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
+                lineStringParser.parse();
+
+                List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
+
+                List<Landmark> cityLandmarks = null;
+                try {
+                    cityLandmarks = CityReader.readCityWktAndGetLandmarks();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
+
+                LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
+
+                byte[] data = lineStringWriter.write().getBytes();
+                topTaxisLineStrings.put(taxi.getTaxiId().toString()+"_"+day, data);
+
+                WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
+                arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
+
+                day.getAndIncrement();
+            });
 
         })).join();
 
