@@ -12,12 +12,12 @@ import java.util.zip.ZipOutputStream;
 
 public class ZipHelper {
 
-    public static byte[] zipBytes(Map<String, byte[]> topTaxisLineStrings) throws IOException {
+    public static byte[] zipBytes(Map<String, byte[]> fileNameAndContent) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ZipOutputStream zos = new ZipOutputStream(baos);
 
-        topTaxisLineStrings.entrySet().forEach(lineStringEntry -> {
-            ZipEntry entry = new ZipEntry("taxi-" + lineStringEntry.getKey() + ".wkt");
+        fileNameAndContent.entrySet().forEach(lineStringEntry -> {
+            ZipEntry entry = new ZipEntry(lineStringEntry.getKey());
             entry.setSize(lineStringEntry.getValue().length);
             try {
                 zos.putNextEntry(entry);

@@ -14,12 +14,6 @@ public class WekaWriter {
         this.closestLandmark = closestLandmark;
     }
 
-    public WekaWriter(List<Landmark> landmarks, Landmark closestLandmark, int moduloFactor) {
-        this.landmarks = landmarks;
-        this.closestLandmark = closestLandmark;
-        this.moduloFactor = moduloFactor;
-    }
-
     public List<Landmark> getLandmarks() {
         return landmarks;
     }
@@ -49,7 +43,7 @@ public class WekaWriter {
                 stringBuilder.append(System.getProperty("line.separator"));
             }
         });
-        System.out.println(stringBuilder.toString());
+        //System.out.println(stringBuilder.toString());
         return stringBuilder.toString();
     }
 

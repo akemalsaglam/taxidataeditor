@@ -64,7 +64,7 @@ public class LineStringWriter {
         });
 
         stringBuilder.append(")");
-        System.out.println(stringBuilder.toString());
+        //System.out.println(stringBuilder.toString());
         return stringBuilder.toString();
     }
 

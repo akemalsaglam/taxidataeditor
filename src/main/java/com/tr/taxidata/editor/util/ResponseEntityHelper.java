@@ -10,11 +10,11 @@ import java.util.Map;
 
 public class ResponseEntityHelper {
 
-    public static ResponseEntity<ByteArrayResource> getZipResponeEntity(Map<String, byte[]> topTaxisLineStrings, int month, long limit) throws IOException {
-        byte[] data = ZipHelper.zipBytes(topTaxisLineStrings);
+    public static ResponseEntity<ByteArrayResource> getZipResponeEntity(Map<String, byte[]> fileNameAndContent, int month, long limit) throws IOException {
+        byte[] data = ZipHelper.zipBytes(fileNameAndContent);
         ByteArrayResource resource = new ByteArrayResource(data);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".zip")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename="+limit+"taxi-month" + month + "-training.zip")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .contentLength(data.length)
                 .body(resource);

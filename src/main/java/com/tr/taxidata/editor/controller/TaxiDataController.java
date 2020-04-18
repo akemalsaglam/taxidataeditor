@@ -4,10 +4,7 @@ import com.tr.taxidata.editor.model.TaxiData;
 import com.tr.taxidata.editor.model.TaxiDataCountDto;
 import com.tr.taxidata.editor.parser.*;
 import com.tr.taxidata.editor.service.TaxiDataService;
-import com.tr.taxidata.editor.util.ArffHelper;
-import com.tr.taxidata.editor.util.ResponseEntityHelper;
-import com.tr.taxidata.editor.util.TaxiDataHelper;
-import com.tr.taxidata.editor.util.ZipHelper;
+import com.tr.taxidata.editor.util.*;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -270,13 +267,14 @@ public class TaxiDataController {
         return ResponseEntityHelper.getZipResponeEntity(topTaxisLineStrings, month, limit);
     }
 
-    @GetMapping(path = "monthly/{month}/week1/all/top/{limit}/download")
+    @GetMapping(path = "month/{month}/week1/taxi/{limit}/download")
     public ResponseEntity<ByteArrayResource> getMonthlyWeek1DataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
-        List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
-        ForkJoinPool forkJoinPool = new ForkJoinPool(20);
-        Map<String, byte[]> topTaxisLineStrings = new HashMap<>();
+        Map<String, byte[]> fileNameAndContent = new HashMap<>();
         List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
 
+        int notMod = 0;
+        List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
+        ForkJoinPool forkJoinPool = new ForkJoinPool(20);
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<List<TaxiData>> taxiDataList = null;
             try {
@@ -293,6 +291,10 @@ public class TaxiDataController {
                 lineStringParser.parse();
 
                 List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
+                landmarks.removeAll(landmarks.stream().filter(landmark -> landmark.getLongitude() < MapHelper.MIN_LONGITUDE
+                        || landmark.getLongitude() > MapHelper.MAX_LONGITUDE
+                        || landmark.getLatitude() < MapHelper.MIN_LATITUDE
+                        || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
                 List<Landmark> cityLandmarks = null;
                 try {
@@ -302,10 +304,10 @@ public class TaxiDataController {
                 }
                 Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
 
-                LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
+                LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, notMod);
 
                 byte[] data = lineStringWriter.write().getBytes();
-                topTaxisLineStrings.put(taxi.getTaxiId().toString() + "_" + day, data);
+                fileNameAndContent.put("taxi-" + taxi.getTaxiId().toString() + "-" + day + ".wkt", data);
 
                 WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
                 arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
@@ -315,11 +317,9 @@ public class TaxiDataController {
 
         })).join();
 
-        TaxiDataHelper.printSettingsByTaxi(topTaxis);
-
-        StringBuilder stringBuilder = ArffHelper.getArffStringBuilder(arffStringWithoutHeader);
-        topTaxisLineStrings.put("all_arff", stringBuilder.toString().getBytes());
-        return ResponseEntityHelper.getZipResponeEntity(topTaxisLineStrings, month, limit);
+        StringBuilder arffStringBuilder = ArffHelper.getArffStringBuilder(arffStringWithoutHeader);
+        fileNameAndContent.put(limit + "taxi-month" + month + ".arff", arffStringBuilder.toString().getBytes());
+        return ResponseEntityHelper.getZipResponeEntity(fileNameAndContent, month, limit);
     }
 
 
