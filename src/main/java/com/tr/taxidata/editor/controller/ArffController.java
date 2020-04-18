@@ -96,10 +96,13 @@ public class ArffController {
         })).join();
 
         StringBuilder stringBuilder = ArffHelper.getArffStringBuilder(arffStringWithoutHeader);
-        topTaxisLineStrings.put("all_arff",stringBuilder.toString().getBytes());
+        topTaxisLineStrings.put("all_arff", stringBuilder.toString().getBytes());
         byte[] data = ZipHelper.zipBytes(topTaxisLineStrings);
         ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntityHelper.getZipResponeEntity(topTaxisLineStrings, month, limit);
+        String zipName = new StringBuilder()
+                .append(limit).append("taxi-month")
+                .append(month).append("-arff.zip").toString();
+        return ResponseEntityHelper.getZipResponeEntity(topTaxisLineStrings, month, limit, zipName);
     }
 
 }

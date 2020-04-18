@@ -15,7 +15,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Service
 public class TaxiDataService {
@@ -31,13 +30,13 @@ public class TaxiDataService {
         return taxiDataRepository.findAll();
     }
 
-    public List<TaxiData> getMonthlyDataByTaxiIdAndMonth(Long id, int month) {
+    public List<TaxiData> getMonthlyDay1DataByTaxiIdAndMonth(Long id, int month) {
         List<TaxiData> taxiData = new ArrayList<>();
         switch (month) {
             case 1:
-                taxiData = taxiDataRepository.getMonth1DataByTaxiId(id);
+                taxiData = taxiDataRepository.getMonth1Day1DataByTaxiId(id);
                 break;
-            case 2:
+            /*case 2:
                 taxiData = taxiDataRepository.getMonth2DataByTaxiId(id);
                 break;
             case 3:
@@ -69,7 +68,7 @@ public class TaxiDataService {
                 break;
             case 12:
                 taxiData = taxiDataRepository.getMonth12DataByTaxiId(id);
-                break;
+                break;*/
         }
         return taxiData;
     }

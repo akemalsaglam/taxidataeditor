@@ -1,12 +1,8 @@
 package com.tr.taxidata.editor.util;
 
-import com.tr.taxidata.editor.model.TaxiDataCountDto;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
