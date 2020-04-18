@@ -1,5 +1,6 @@
 
 .idea/
 target/
+taxidataeditor.imlclear
 taxidataeditor.iml
 src/main/resources/application.properties
