@@ -8,7 +8,10 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
@@ -26,268 +29,29 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @RestController
-@RequestMapping(path = "/taxidata")
-public class TaxiDataController {
+@RequestMapping(path = "/arff")
+public class ArffController {
+
+    private static final double MAX_LATITUDE = 40.2891;
+    private static final double MIN_LATITUDE = 40.1652;
+    private static final double MAX_LONGITUDE = 29.2001;
+    private static final double MIN_LONGITUDE = 28.7994;
+
 
     private TaxiDataService taxiDataService;
 
-    public TaxiDataController(TaxiDataService taxiDataService) {
+    public ArffController(TaxiDataService taxiDataService) {
         this.taxiDataService = taxiDataService;
     }
 
-    @GetMapping(path = "/")
-    public List<TaxiData> getAll() {
-        return taxiDataService.findAll();
-    }
-
-    @GetMapping(path = "/{id}")
-    public TaxiData get(@PathVariable("id") Long id) {
-        return taxiDataService.getById(id).orElse(new TaxiData());
-    }
-
-    @GetMapping(path = "/{id}/monthly/{month}/")
-    public List<TaxiData> getMonth1DataByTaxiId(@PathVariable("id") Long id, @PathVariable("month") int month) {
-        return taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
-    }
-
-    @GetMapping(path = "/{id}/monthly/{month}/linestring")
-    public String getMonthlyDataByTaxiIdLineString(@PathVariable("id") Long id, @PathVariable("month") int month) throws IOException {
-        System.out.println("fetching data from db...");
-        List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
-        List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
-
-        System.out.println("parsing linestrings...");
-        LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
-        lineStringParser.parse();
-
-        System.out.println("transforming latitudes/longitudes to x,y coordinates...");
-        List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
-
-        // TODO: we can calculate closest point by including all points
-        System.out.println("finding closest point in map...");
-        List<Landmark> cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-        Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
-
-        System.out.println("writing results...");
-        LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark);
-        return lineStringWriter.write();
-    }
-
-    @GetMapping(path = "/{id}/monthly/{month}/linestring/download", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public ResponseEntity<ByteArrayResource> getMonthlyDataByTaxiIdLineStringDownload(@PathVariable("id") Long id, @PathVariable("month") int month, HttpServletResponse response) throws IOException {
-        System.out.println("fetching data from db...");
-        List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
-        List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
-
-        System.out.println("parsing linestrings...");
-        LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
-        lineStringParser.parse();
-
-        System.out.println("transforming latitudes/longitudes to x,y coordinates...");
-        List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
-
-        System.out.println("finding closest point in map...");
-        List<Landmark> cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-        Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
-
-        System.out.println("writing results...");
-        LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
-        response.setContentType("text/plain");
-        response.setCharacterEncoding("UTF-8");
-
-        byte[] data = lineStringWriter.write().getBytes();
-        ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi-" + id + ".wkt")
-                .contentType(MediaType.TEXT_PLAIN)
-                .contentLength(data.length)
-                .body(resource);
-    }
-
-    @GetMapping(path = "monthly/{month}/linestring/top/{limit}/download")
-    public ResponseEntity<ByteArrayResource> getMonthlyDataByTaxiIdLineStringForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
-        List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
-        ForkJoinPool forkJoinPool = new ForkJoinPool(20);
-        Map<String, byte[]> topTaxisLineStrings = new HashMap<>();
-
-        forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
-            List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(taxi.getTaxiId(), month);
-            List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
-
-            LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
-            lineStringParser.parse();
-
-            List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
-
-            List<Landmark> cityLandmarks = null;
-            try {
-                cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
-
-            LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
-
-            byte[] data = lineStringWriter.write().getBytes();
-            topTaxisLineStrings.put(taxi.getTaxiId().toString(), data);
-        })).join();
-
-        printSettingsByTaxi(topTaxis);
-
-        byte[] data = zipBytes(topTaxisLineStrings);
-        ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".zip")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .contentLength(data.length)
-                .body(resource);
-    }
-
-    @GetMapping(path = "/{id}/monthly/{month}/arff")
-    public String getMonthlyDataByTaxiIdArff(@PathVariable("id") Long id, @PathVariable("month") int month) throws IOException {
-        System.out.println("fetching data from db...");
-        List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
-
-        System.out.println("parsing linestrings...");
-        List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
-        LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
-        lineStringParser.parse();
-
-        System.out.println("transforming latitudes/longitudes to x,y coordinates...");
-        List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
-
-        System.out.println("finding closest point in map...");
-        List<Landmark> cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-        Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
-
-        System.out.println("writing weka results...");
-        WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
-        return wekaWriter.write();
-
-    }
-
-    @GetMapping(path = "/{id}/monthly/{month}/arff/download")
-    public ResponseEntity<ByteArrayResource> getMonthlyDataByTaxiIdArffDownload(@PathVariable("id") Long id, @PathVariable("month") int month) throws IOException {
-        System.out.println("fetching data from db...");
-        List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(id, month);
-
-        System.out.println("parsing linestrings...");
-        List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
-        LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
-        lineStringParser.parse();
-
-        System.out.println("transforming latitudes/longitudes to x,y coordinates...");
-        List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
-
-        System.out.println("finding closest point in map...");
-        List<Landmark> cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-        Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
-
-        System.out.println("writing weka results...");
-        WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
-
-        byte[] data = wekaWriter.write().getBytes();
-        ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi-" + id + ".arff")
-                .contentType(MediaType.TEXT_PLAIN)
-                .contentLength(data.length)
-                .body(resource);
-    }
-
-    @GetMapping(path = "monthly/{month}/arff/top/{limit}/download")
-    public ResponseEntity<ByteArrayResource> getMonthlyTopTaxiArffDownload(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
-
-        List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
-        ForkJoinPool forkJoinPool = new ForkJoinPool(20);
-        List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
-        forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
-
-            List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(taxi.getTaxiId(), month);
-
-            List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
-            LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
-            lineStringParser.parse();
-
-            List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
-
-            List<Landmark> cityLandmarks = null;
-            try {
-                cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
-
-            WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
-            arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
-        })).join();
-
-        StringBuilder stringBuilder = getArffStringBuilder(arffStringWithoutHeader);
-
-        byte[] data = stringBuilder.toString().getBytes();
-        ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".arff")
-                .contentType(MediaType.TEXT_PLAIN)
-                .contentLength(data.length)
-                .body(resource);
-    }
-
-    @GetMapping(path = "monthly/{month}/all/top/{limit}/download")
-    public ResponseEntity<ByteArrayResource> getMonthlyDataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
-        List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
-        ForkJoinPool forkJoinPool = new ForkJoinPool(20);
-        Map<String, byte[]> topTaxisLineStrings = new HashMap<>();
-        List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
-
-        forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
-            List<TaxiData> taxiData = taxiDataService.getMonthlyDataByTaxiIdAndMonth(taxi.getTaxiId(), month);
-            List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
-
-            LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
-            lineStringParser.parse();
-
-            List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
-
-            List<Landmark> cityLandmarks = null;
-            try {
-                cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
-
-            LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
-
-            byte[] data = lineStringWriter.write().getBytes();
-            topTaxisLineStrings.put(taxi.getTaxiId().toString(), data);
-
-            WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
-            arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
-
-        })).join();
-
-        printSettingsByTaxi(topTaxis);
-        StringBuilder stringBuilder = getArffStringBuilder(arffStringWithoutHeader);
-        topTaxisLineStrings.put("all_arff",stringBuilder.toString().getBytes());
-        byte[] data = zipBytes(topTaxisLineStrings);
-        ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".zip")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .contentLength(data.length)
-                .body(resource);
-    }
-
-    @GetMapping(path = "monthly/{month}/week1/all/top/{limit}/download")
+    @GetMapping(path = "monthly/{month}/week1/all/top/{limit}")
     public ResponseEntity<ByteArrayResource> getMonthlyWeek1DataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
         List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
         ForkJoinPool forkJoinPool = new ForkJoinPool(20);
         Map<String, byte[]> topTaxisLineStrings = new HashMap<>();
         List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
 
+        AtomicInteger oufOfBoundCount = new AtomicInteger(0);
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<List<TaxiData>> taxiDataList = null;
             try {
@@ -296,14 +60,32 @@ public class TaxiDataController {
                 e.printStackTrace();
             }
 
-            AtomicInteger day= new AtomicInteger(1);
-            taxiDataList.forEach(taxiData->{
+            AtomicInteger day = new AtomicInteger(1);
+
+
+            taxiDataList.forEach(taxiData -> {
                 List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
 
                 LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
                 lineStringParser.parse();
 
                 List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
+
+
+                /*landmarks.forEach(landmark -> {
+                    if (landmark.getLongitude() < MIN_LONGITUDE
+                            || landmark.getLongitude() > MAX_LONGITUDE
+                            || landmark.getLatitude() < MIN_LATITUDE
+                            || landmark.getLatitude() > MAX_LATITUDE) {
+                        System.out.println("longitude: " + landmark.getLongitude() + ", latitude: " + landmark.getLatitude());
+                        oufOfBoundCount.getAndIncrement();
+                    }
+                });*/
+
+                landmarks.removeAll(landmarks.stream().filter(landmark -> landmark.getLongitude() < MIN_LONGITUDE
+                        || landmark.getLongitude() > MAX_LONGITUDE
+                        || landmark.getLatitude() < MIN_LATITUDE
+                        || landmark.getLatitude() > MAX_LATITUDE).collect(Collectors.toList()));
 
                 List<Landmark> cityLandmarks = null;
                 try {
@@ -315,8 +97,8 @@ public class TaxiDataController {
 
                 LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
 
-                byte[] data = lineStringWriter.write().getBytes();
-                topTaxisLineStrings.put(taxi.getTaxiId().toString()+"_"+day, data);
+                /*byte[] data = lineStringWriter.write().getBytes();
+                topTaxisLineStrings.put(taxi.getTaxiId().toString() + "_" + day, data);*/
 
                 WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
                 arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
@@ -326,7 +108,6 @@ public class TaxiDataController {
 
         })).join();
 
-        printSettingsByTaxi(topTaxis);
         StringBuilder stringBuilder = getArffStringBuilder(arffStringWithoutHeader);
         topTaxisLineStrings.put("all_arff",stringBuilder.toString().getBytes());
         byte[] data = zipBytes(topTaxisLineStrings);

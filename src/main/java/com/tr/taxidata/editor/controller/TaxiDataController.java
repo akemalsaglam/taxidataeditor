@@ -4,6 +4,10 @@ import com.tr.taxidata.editor.model.TaxiData;
 import com.tr.taxidata.editor.model.TaxiDataCountDto;
 import com.tr.taxidata.editor.parser.*;
 import com.tr.taxidata.editor.service.TaxiDataService;
+import com.tr.taxidata.editor.util.ArffHelper;
+import com.tr.taxidata.editor.util.ResponseEntityHelper;
+import com.tr.taxidata.editor.util.TaxiDataHelper;
+import com.tr.taxidata.editor.util.ZipHelper;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -22,8 +25,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping(path = "/taxidata")
@@ -35,15 +36,6 @@ public class TaxiDataController {
         this.taxiDataService = taxiDataService;
     }
 
-    @GetMapping(path = "/")
-    public List<TaxiData> getAll() {
-        return taxiDataService.findAll();
-    }
-
-    @GetMapping(path = "/{id}")
-    public TaxiData get(@PathVariable("id") Long id) {
-        return taxiDataService.getById(id).orElse(new TaxiData());
-    }
 
     @GetMapping(path = "/{id}/monthly/{month}/")
     public List<TaxiData> getMonth1DataByTaxiId(@PathVariable("id") Long id, @PathVariable("month") int month) {
@@ -133,9 +125,9 @@ public class TaxiDataController {
             topTaxisLineStrings.put(taxi.getTaxiId().toString(), data);
         })).join();
 
-        printSettingsByTaxi(topTaxis);
+        TaxiDataHelper.printSettingsByTaxi(topTaxis);
 
-        byte[] data = zipBytes(topTaxisLineStrings);
+        byte[] data = ZipHelper.zipBytes(topTaxisLineStrings);
         ByteArrayResource resource = new ByteArrayResource(data);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".zip")
@@ -224,7 +216,7 @@ public class TaxiDataController {
             arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
         })).join();
 
-        StringBuilder stringBuilder = getArffStringBuilder(arffStringWithoutHeader);
+        StringBuilder stringBuilder = ArffHelper.getArffStringBuilder(arffStringWithoutHeader);
 
         byte[] data = stringBuilder.toString().getBytes();
         ByteArrayResource resource = new ByteArrayResource(data);
@@ -269,16 +261,13 @@ public class TaxiDataController {
 
         })).join();
 
-        printSettingsByTaxi(topTaxis);
-        StringBuilder stringBuilder = getArffStringBuilder(arffStringWithoutHeader);
-        topTaxisLineStrings.put("all_arff",stringBuilder.toString().getBytes());
-        byte[] data = zipBytes(topTaxisLineStrings);
-        ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".zip")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .contentLength(data.length)
-                .body(resource);
+        TaxiDataHelper.printSettingsByTaxi(topTaxis);
+
+        StringBuilder stringBuilder = ArffHelper.getArffStringBuilder(arffStringWithoutHeader);
+
+        topTaxisLineStrings.put("all_arff", stringBuilder.toString().getBytes());
+
+        return ResponseEntityHelper.getZipResponeEntity(topTaxisLineStrings, month, limit);
     }
 
     @GetMapping(path = "monthly/{month}/week1/all/top/{limit}/download")
@@ -296,8 +285,8 @@ public class TaxiDataController {
                 e.printStackTrace();
             }
 
-            AtomicInteger day= new AtomicInteger(1);
-            taxiDataList.forEach(taxiData->{
+            AtomicInteger day = new AtomicInteger(1);
+            taxiDataList.forEach(taxiData -> {
                 List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
 
                 LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
@@ -316,7 +305,7 @@ public class TaxiDataController {
                 LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
 
                 byte[] data = lineStringWriter.write().getBytes();
-                topTaxisLineStrings.put(taxi.getTaxiId().toString()+"_"+day, data);
+                topTaxisLineStrings.put(taxi.getTaxiId().toString() + "_" + day, data);
 
                 WekaWriter wekaWriter = new WekaWriter(landmarks, closestLandmark);
                 arffStringWithoutHeader.add(wekaWriter.getArffStringWithoutHeader());
@@ -326,71 +315,12 @@ public class TaxiDataController {
 
         })).join();
 
-        printSettingsByTaxi(topTaxis);
-        StringBuilder stringBuilder = getArffStringBuilder(arffStringWithoutHeader);
-        topTaxisLineStrings.put("all_arff",stringBuilder.toString().getBytes());
-        byte[] data = zipBytes(topTaxisLineStrings);
-        ByteArrayResource resource = new ByteArrayResource(data);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=taxi_lineStrings_month" + month + "_top" + limit + ".zip")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .contentLength(data.length)
-                .body(resource);
+        TaxiDataHelper.printSettingsByTaxi(topTaxis);
+
+        StringBuilder stringBuilder = ArffHelper.getArffStringBuilder(arffStringWithoutHeader);
+        topTaxisLineStrings.put("all_arff", stringBuilder.toString().getBytes());
+        return ResponseEntityHelper.getZipResponeEntity(topTaxisLineStrings, month, limit);
     }
 
-    private StringBuilder getArffStringBuilder(List<StringBuilder> arffStringWithoutHeader) {
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("@RELATION taxi");
-        stringBuilder.append(System.getProperty("line.separator"));
-        stringBuilder.append(System.getProperty("line.separator"));
-        stringBuilder.append("@ATTRIBUTE xValue REAL");
-        stringBuilder.append(System.getProperty("line.separator"));
-        stringBuilder.append("@ATTRIBUTE yValue REAL");
-        stringBuilder.append(System.getProperty("line.separator"));
-        stringBuilder.append(System.getProperty("line.separator"));
-        stringBuilder.append("@DATA");
-        stringBuilder.append(System.getProperty("line.separator"));
-        arffStringWithoutHeader.forEach(stringBuilder::append);
-        return stringBuilder;
-    }
-
-    private static void printSettingsByTaxi(List<TaxiDataCountDto> topTaxis) {
-        AtomicInteger index = new AtomicInteger(1);
-        topTaxis.forEach(taxi -> {
-            StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.append("Group").append(index.get()).append(".groupID = taxi").append(index.get()).append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".hostName = taxi-").append(taxi.getTaxiId()).append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".okMaps = 1").append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".speed = 8.3, 25").append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".nrofHosts = 1").append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".movementModel = MapRouteMovement").append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".routeFile = data/custom/taxidata/bursa-0101/taxi-").append(taxi.getTaxiId()).append(".wkt").append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".routeType = 1").append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".routeFirstStop = 0").append(System.lineSeparator());
-            stringBuilder.append(" ").append(System.lineSeparator());
-            index.getAndIncrement();
-            System.out.println(stringBuilder.toString());
-        });
-    }
-
-    private static byte[] zipBytes(Map<String, byte[]> topTaxisLineStrings) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ZipOutputStream zos = new ZipOutputStream(baos);
-
-        topTaxisLineStrings.entrySet().forEach(lineStringEntry -> {
-            ZipEntry entry = new ZipEntry("taxi-" + lineStringEntry.getKey() + ".wkt");
-            entry.setSize(lineStringEntry.getValue().length);
-            try {
-                zos.putNextEntry(entry);
-                zos.write(lineStringEntry.getValue());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-
-        zos.closeEntry();
-        zos.close();
-        return baos.toByteArray();
-    }
 
 }
