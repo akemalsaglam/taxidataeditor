@@ -230,7 +230,7 @@ public class TaxiDataController {
     public ResponseEntity<ByteArrayResource> getMonthlyDataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
         List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
         Map<String, byte[]> fileNameAndContent = new HashMap<>();
-        Map<String, Long> meanSpeedByTaxi = new HashMap<>();
+        Map<Long, Long> meanSpeedByTaxi = new HashMap<>();
         List<String> aggregatedLineStrings = new ArrayList<>();
 
         ForkJoinPool forkJoinPool = new ForkJoinPool(20);
@@ -238,7 +238,7 @@ public class TaxiDataController {
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<TaxiData> taxiData = taxiDataService.getMonthlyDay1DataByTaxiIdAndMonth(taxi.getTaxiId(), month);
             long meanSpeed = Math.round(taxiData.stream().map(TaxiData::getSpeed).mapToDouble(speed -> speed).average().getAsDouble());
-            meanSpeedByTaxi.put(taxiData.get(0).getId().toString(), meanSpeed);
+            meanSpeedByTaxi.put(taxiData.get(0).getTaxiId(), meanSpeed);
             List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
 
             LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
