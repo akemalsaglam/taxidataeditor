@@ -225,7 +225,6 @@ public class TaxiDataController {
     }
 
     //***************************************************************
-
     @GetMapping(path = "month/{month}/day1/taxi/{limit}/download")
     public ResponseEntity<ByteArrayResource> getMonthlyDataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
         List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
@@ -332,6 +331,5 @@ public class TaxiDataController {
                 .append(month).append("-training.zip").toString();
         return ResponseEntityHelper.getZipResponeEntity(fileNameAndContent, month, limit, zipName);
     }
-
 
 }

@@ -33,12 +33,13 @@ public class TaxiDataHelper {
         AtomicInteger index = new AtomicInteger(1);
         List<String> settings = new ArrayList<>();
         topTaxis.forEach(taxi -> {
-            double speedToMeterDivideSecond = SpeedHelper.changeSpeedToMeterDivideSecond(meanSpeedByTaxi.get(taxi.getTaxiId()));
+            double minSpeedToMeterDivideSecond = SpeedHelper.changeSpeedToMeterDivideSecond(meanSpeedByTaxi.get(taxi.getTaxiId()) - 5);
+            double maxSpeedToMeterDivideSecond = SpeedHelper.changeSpeedToMeterDivideSecond(meanSpeedByTaxi.get(taxi.getTaxiId()) + 5);
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder.append("Group").append(index.get()).append(".groupID = taxi").append(index.get()).append(System.lineSeparator());
             stringBuilder.append("Group").append(index.get()).append(".hostName = taxi-").append(taxi.getTaxiId()).append(System.lineSeparator());
             stringBuilder.append("Group").append(index.get()).append(".okMaps = 1").append(System.lineSeparator());
-            stringBuilder.append("Group").append(index.get()).append(".speed = ").append(speedToMeterDivideSecond - 5).append(", ").append(speedToMeterDivideSecond + 5).append(System.lineSeparator());
+            stringBuilder.append("Group").append(index.get()).append(".speed = ").append(minSpeedToMeterDivideSecond).append(", ").append(maxSpeedToMeterDivideSecond).append(System.lineSeparator());
             stringBuilder.append("Group").append(index.get()).append(".nrofHosts = 1").append(System.lineSeparator());
             stringBuilder.append("Group").append(index.get()).append(".movementModel = MapRouteMovement").append(System.lineSeparator());
             stringBuilder.append("Group").append(index.get()).append(".routeFile = data/custom/taxidata/bursa-0101/taxi-").append(taxi.getTaxiId()).append(".wkt").append(System.lineSeparator());
