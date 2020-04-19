@@ -1,10 +1,7 @@
 package com.tr.taxidata.editor.model;
 
-import org.springframework.stereotype.Component;
-
 import javax.persistence.*;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "bursa_taxi_data")

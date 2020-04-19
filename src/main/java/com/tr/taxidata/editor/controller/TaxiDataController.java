@@ -230,12 +230,15 @@ public class TaxiDataController {
     public ResponseEntity<ByteArrayResource> getMonthlyDataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
         List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
         Map<String, byte[]> fileNameAndContent = new HashMap<>();
-
+        Map<String, Long> meanSpeedByTaxi = new HashMap<>();
         List<String> aggregatedLineStrings = new ArrayList<>();
+
         ForkJoinPool forkJoinPool = new ForkJoinPool(20);
         int mod10 = 10;
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<TaxiData> taxiData = taxiDataService.getMonthlyDay1DataByTaxiIdAndMonth(taxi.getTaxiId(), month);
+            long meanSpeed = Math.round(taxiData.stream().map(TaxiData::getSpeed).mapToDouble(speed -> speed).average().getAsDouble());
+            meanSpeedByTaxi.put(taxiData.get(0).getId().toString(), meanSpeed);
             List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
 
             LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
@@ -264,7 +267,7 @@ public class TaxiDataController {
 
         })).join();
 
-        fileNameAndContent.put("settings.txt", TaxiDataHelper.getSimulationSettingsForTaxi(topTaxis).getBytes());
+        fileNameAndContent.put("settings.txt", TaxiDataHelper.getSimulationSettingsForTaxi(topTaxis, meanSpeedByTaxi).getBytes());
         fileNameAndContent.put("allLineStrings.txt", aggregatedLineStrings.stream().collect(Collectors.joining(System.lineSeparator())).getBytes());
         String zipName = new StringBuilder()
                 .append(limit).append("taxi-month")
