@@ -22,10 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -84,7 +81,11 @@ public class ArffController {
                         || landmark.getLatitude() < MapHelper.MIN_LATITUDE
                         || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
-                Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
+                List<Landmark> orderedLandmarks = landmarks.stream()
+                        .sorted(Comparator.comparing(Landmark::getDate))
+                        .collect(Collectors.toList());
+
+                Landmark closestLandmark = ClosestPositionCalculator.calculate(orderedLandmarks.get(0), finalCityLandmarks);
 
                 LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
 

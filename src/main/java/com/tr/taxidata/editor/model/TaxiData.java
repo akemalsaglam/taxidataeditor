@@ -15,6 +15,7 @@ public class TaxiData {
     private String direction;
     private String position;
     private String line;
+    private Long timeInSecond;
 
     public TaxiData() {
     }
@@ -86,6 +87,15 @@ public class TaxiData {
     @Column(name = "line")
     public String getLine() {
         return line;
+    }
+
+    @Column(name = "timeInSecond")
+    public Long getTimeInSecond() {
+        return timeInSecond;
+    }
+
+    public void setTimeInSecond(Long timeInSecond) {
+        this.timeInSecond = timeInSecond;
     }
 
     public void setLine(String line) {

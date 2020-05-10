@@ -9,6 +9,7 @@ public class Landmark {
     double x = 0;
     double y = 0;
     private Timestamp date;
+    private Long timeInSecond;
 
     public long getId() {
         return id;
@@ -56,6 +57,14 @@ public class Landmark {
 
     public void setDate(Timestamp date) {
         this.date = date;
+    }
+
+    public Long getTimeInSecond() {
+        return timeInSecond;
+    }
+
+    public void setTimeInSecond(Long timeInSecond) {
+        this.timeInSecond = timeInSecond;
     }
 
     @Override

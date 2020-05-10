@@ -28,6 +28,7 @@ public class LineStringParser {
             landmark.setLatitude(Double.parseDouble(coordinates[0].split(" ")[1].trim()));
             landmark.setLongitude(Double.parseDouble(coordinates[0].split(" ")[0].trim()));
             landmark.setDate(value.getDate());
+            landmark.setTimeInSecond(value.getTimeInSecond());
             this.landmarks.add(landmark);
         });
 

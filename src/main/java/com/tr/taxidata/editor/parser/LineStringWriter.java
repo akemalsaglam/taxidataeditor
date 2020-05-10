@@ -50,18 +50,25 @@ public class LineStringWriter {
 
         List<Landmark> selectedLandmarks = new ArrayList<>();
 
-        IntStream.range(0, this.landmarks.size()).forEach(index -> {
-            if (moduloFactor == 0 || (index % moduloFactor == 0)) {
-                selectedLandmarks.add(this.landmarks.get(index));
+        List<Landmark> orderedLandmarks = this.landmarks.stream()
+                .sorted(Comparator.comparing(Landmark::getDate))
+                .collect(Collectors.toList());
 
+        IntStream.range(0, orderedLandmarks.size()).forEach(index -> {
+            if (moduloFactor == 0 || (index % moduloFactor == 0)) {
+                selectedLandmarks.add(orderedLandmarks.get(index));
             }
         });
 
-        IntStream.range(0, selectedLandmarks.size()).forEach(index -> {
-            stringBuilder.append(selectedLandmarks.get(index).getX());
+        List<Landmark> orderedSelectedLandmarks = selectedLandmarks.stream()
+                .sorted(Comparator.comparing(Landmark::getDate))
+                .collect(Collectors.toList());
+
+        IntStream.range(0, orderedSelectedLandmarks.size()).forEach(index -> {
+            stringBuilder.append(orderedSelectedLandmarks.get(index).getX());
             stringBuilder.append(" ");
-            stringBuilder.append(selectedLandmarks.get(index).getY());
-            if (index != (selectedLandmarks.size() - 1)) {
+            stringBuilder.append(orderedSelectedLandmarks.get(index).getY());
+            if (index != (orderedSelectedLandmarks.size() - 1)) {
                 stringBuilder.append(", ");
             }
         });
@@ -88,11 +95,11 @@ public class LineStringWriter {
 
         IntStream.range(0, orderedLandmarks.size()).forEach(index -> {
             if (moduloFactor == 0 || (index % moduloFactor == 0)) {
-                stringBuilder.append(orderedLandmarks.get(index).getLongitude())
+                stringBuilder.append(orderedLandmarks.get(index).getX())
                         .append(",")
-                        .append(orderedLandmarks.get(index).getLatitude())
+                        .append(orderedLandmarks.get(index).getY())
                         .append(",")
-                        .append(orderedLandmarks.get(index).getDate())
+                        .append(orderedLandmarks.get(index).getTimeInSecond())
                         .append(System.lineSeparator());
             }
         });

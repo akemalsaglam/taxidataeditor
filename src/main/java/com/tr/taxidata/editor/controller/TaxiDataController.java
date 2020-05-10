@@ -16,10 +16,7 @@ import java.io.IOException;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -227,7 +224,7 @@ public class TaxiDataController {
     }
 */
     //***************************************************************
-    @GetMapping(path = "month/{month}/day1/taxi/{limit}/download")
+    @GetMapping(path = "month/{month}/day1/taxi/{limit}/simulation/download")
     public ResponseEntity<ByteArrayResource> getMonthlyDataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
         List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
         Map<String, byte[]> fileNameAndContent = new HashMap<>();
@@ -261,18 +258,25 @@ public class TaxiDataController {
                     || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
 
-            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
+
+            List<Landmark> orderedLandmarks = landmarks.stream()
+                    .sorted(Comparator.comparing(Landmark::getDate))
+                    .collect(Collectors.toList());
+
+            Landmark closestLandmark = ClosestPositionCalculator.calculate(orderedLandmarks.get(0), finalCityLandmarks);
 
             LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, mod10);
 
             String lineString = lineStringWriter.write();
+            String pointsWithSeconds=lineStringWriter.writeWithTimeData();
             aggregatedLineStrings.add(lineString);
             byte[] data = lineString.getBytes();
             fileNameAndContent.put("taxi-" + taxi.getTaxiId() + ".wkt", data);
+            fileNameAndContent.put("taxi-" + taxi.getTaxiId() + "-second.wkt", pointsWithSeconds.getBytes());
 
         })).join();
 
-        fileNameAndContent.put("settings.txt", TaxiDataHelper.getSimulationSettingsForTaxi(topTaxis, meanSpeedByTaxi).getBytes());
+        fileNameAndContent.put("settings.txt", TaxiDataHelper.getSimulationSettingsForTaxi(topTaxis, meanSpeedByTaxi, month).getBytes());
         fileNameAndContent.put("allLineStrings.txt", aggregatedLineStrings.stream().collect(Collectors.joining(System.lineSeparator())).getBytes());
         String zipName = new StringBuilder()
                 .append(limit).append("taxi-month")
@@ -280,7 +284,7 @@ public class TaxiDataController {
         return ResponseEntityHelper.getZipResponeEntity(fileNameAndContent, month, limit, zipName);
     }
 
-    @GetMapping(path = "month/{month}/week1/taxi/{limit}/download")
+    @GetMapping(path = "month/{month}/week1/taxi/{limit}/training/download")
     public ResponseEntity<ByteArrayResource> getMonthlyWeek1DataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
         Map<String, byte[]> fileNameAndContent = new HashMap<>();
         List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
@@ -318,8 +322,11 @@ public class TaxiDataController {
                         || landmark.getLatitude() < MapHelper.MIN_LATITUDE
                         || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
+                List<Landmark> orderedLandmarks = landmarks.stream()
+                        .sorted(Comparator.comparing(Landmark::getDate))
+                        .collect(Collectors.toList());
 
-                Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
+                Landmark closestLandmark = ClosestPositionCalculator.calculate(orderedLandmarks.get(0), finalCityLandmarks);
 
                 LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, notMod);
 
@@ -375,8 +382,11 @@ public class TaxiDataController {
                     || landmark.getLatitude() < MapHelper.MIN_LATITUDE
                     || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
+            List<Landmark> orderedLandmarks = landmarks.stream()
+                    .sorted(Comparator.comparing(Landmark::getDate))
+                    .collect(Collectors.toList());
 
-            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
+            Landmark closestLandmark = ClosestPositionCalculator.calculate(orderedLandmarks.get(0), finalCityLandmarks);
 
             LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, mod);
 
@@ -387,7 +397,7 @@ public class TaxiDataController {
 
         })).join();
 
-        fileNameAndContent.put("settings.txt", TaxiDataHelper.getSimulationSettingsForTaxi(topTaxis, meanSpeedByTaxi).getBytes());
+        fileNameAndContent.put("settings.txt", TaxiDataHelper.getSimulationSettingsForTaxi(topTaxis, meanSpeedByTaxi,month).getBytes());
         fileNameAndContent.put("allLineStrings.txt", aggregatedLineStrings.stream().collect(Collectors.joining(System.lineSeparator())).getBytes());
         String zipName = new StringBuilder()
                 .append(limit).append("taxi-month")

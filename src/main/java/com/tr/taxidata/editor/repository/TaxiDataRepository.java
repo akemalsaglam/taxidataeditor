@@ -53,12 +53,13 @@ public interface TaxiDataRepository extends JpaRepository<TaxiData, Long> {
     @Query(value = "select btd.taxi_id as taxiId,count(*) as logCount from public.bursa_taxi_data_month1 btd group by btd.taxi_id order by logCount desc limit ?1", nativeQuery = true)
     List<Object[]> getMonth1TopTaxis(Long limit);
 
-    @Query(value = "select * from public.bursa_taxi_data_month1 tdmv " +
+    /*@Query(value = "select * from public.bursa_taxi_data_month1 tdmv " +
             "where tdmv.taxi_id=?1 " +
             "and tdmv.date>'2019-01-01 00:00:00' and tdmv.date<'2019-01-08 00:00:00' order by \"date\" asc", nativeQuery = true)
-    List<TaxiData> getMonth1Week1DataByTaxiId(Long taxiId);
+    List<TaxiData> getMonth1Week1DataByTaxiId(Long taxiId);*/
 
-    @Query(value = "select * from public.bursa_taxi_data_month1 tdmv " +
+    @Query(value = "select *, (extract(hour from date) * 60 * 60 + extract(minute from date) * 60 + extract(second from date) ) as timeInSecond" +
+            " from public.bursa_taxi_data_month1 tdmv " +
             "where tdmv.taxi_id=?1 " +
             "and tdmv.date > ?2 and tdmv.date < ?3 order by \"date\" asc", nativeQuery = true)
     List<TaxiData> getMonth1Week1DataByTaxiId(Long taxiId, Timestamp startDate, Timestamp endDate);
