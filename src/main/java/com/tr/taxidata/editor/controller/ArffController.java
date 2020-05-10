@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -49,7 +50,15 @@ public class ArffController {
         Map<String, byte[]> topTaxisLineStrings = new HashMap<>();
         List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
 
+        List<Landmark> cityLandmarks = null;
+        try {
+            cityLandmarks = CityReader.readCityWktAndGetLandmarks();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         AtomicInteger oufOfBoundCount = new AtomicInteger(0);
+        List<Landmark> finalCityLandmarks = cityLandmarks;
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<List<TaxiData>> taxiDataList = null;
             try {
@@ -62,7 +71,8 @@ public class ArffController {
 
 
             taxiDataList.forEach(taxiData -> {
-                List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+                //List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+                Map<Long, TaxiData> taxiDataPositions = taxiData.stream().collect(Collectors.toMap(TaxiData::getId, taxiDatax->taxiDatax));
 
                 LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
                 lineStringParser.parse();
@@ -74,13 +84,7 @@ public class ArffController {
                         || landmark.getLatitude() < MapHelper.MIN_LATITUDE
                         || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
-                List<Landmark> cityLandmarks = null;
-                try {
-                    cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
+                Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
 
                 LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, 10);
 

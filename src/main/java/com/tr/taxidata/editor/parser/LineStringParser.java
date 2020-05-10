@@ -1,23 +1,19 @@
 package com.tr.taxidata.editor.parser;
 
+import com.tr.taxidata.editor.model.TaxiData;
+
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class LineStringParser {
-    private List<String> positions;
+    private Map<Long, TaxiData> positions;
     private List<Landmark> landmarks;
 
-    public LineStringParser(List<String> position) {
+    public LineStringParser(Map<Long, TaxiData> position) {
         this.positions = position;
         landmarks = new ArrayList<>();
-    }
-
-    public List<String> getPosition() {
-        return positions;
-    }
-
-    public void setPosition(List<String> position) {
-        this.positions = position;
     }
 
     public List<Landmark> getLandmarks() {
@@ -25,12 +21,13 @@ public class LineStringParser {
     }
 
     public void parse() {
-        positions.forEach(position->{
-            String coordinatesString = position.substring(11, position.length() - 1);
+        positions.forEach((key, value) -> {
+            String coordinatesString = value.getPosition().substring(11, value.getPosition().length() - 1);
             String[] coordinates = coordinatesString.split(",");
-            Landmark landmark=new Landmark();
+            Landmark landmark = new Landmark();
             landmark.setLatitude(Double.parseDouble(coordinates[0].split(" ")[1].trim()));
             landmark.setLongitude(Double.parseDouble(coordinates[0].split(" ")[0].trim()));
+            landmark.setDate(value.getDate());
             this.landmarks.add(landmark);
         });
 

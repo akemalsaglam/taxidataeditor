@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,7 +36,7 @@ public class TaxiDataController {
     }
 
 
-    @GetMapping(path = "/{id}/monthly/{month}/")
+    /*@GetMapping(path = "/{id}/monthly/{month}/")
     public List<TaxiData> getMonth1DataByTaxiId(@PathVariable("id") Long id, @PathVariable("month") int month) {
         return taxiDataService.getMonthlyDay1DataByTaxiIdAndMonth(id, month);
     }
@@ -223,7 +225,7 @@ public class TaxiDataController {
                 .contentLength(data.length)
                 .body(resource);
     }
-
+*/
     //***************************************************************
     @GetMapping(path = "month/{month}/day1/taxi/{limit}/download")
     public ResponseEntity<ByteArrayResource> getMonthlyDataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
@@ -232,13 +234,22 @@ public class TaxiDataController {
         Map<Long, Long> meanSpeedByTaxi = new HashMap<>();
         List<String> aggregatedLineStrings = new ArrayList<>();
 
+        List<Landmark> cityLandmarks = null;
+        try {
+            cityLandmarks = CityReader.readCityWktAndGetLandmarks();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         ForkJoinPool forkJoinPool = new ForkJoinPool(20);
         int mod10 = 0;
+        List<Landmark> finalCityLandmarks = cityLandmarks;
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<TaxiData> taxiData = taxiDataService.getMonthlyDay1DataByTaxiIdAndMonth(taxi.getTaxiId(), month);
             long meanSpeed = Math.round(taxiData.stream().map(TaxiData::getSpeed).mapToDouble(speed -> speed).average().getAsDouble());
             meanSpeedByTaxi.put(taxiData.get(0).getTaxiId(), meanSpeed);
-            List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+            //List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+            Map<Long, TaxiData> taxiDataPositions = taxiData.stream().collect(Collectors.toMap(TaxiData::getId, taxiDatax->taxiDatax));
 
             LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
             lineStringParser.parse();
@@ -249,13 +260,8 @@ public class TaxiDataController {
                     || landmark.getLatitude() < MapHelper.MIN_LATITUDE
                     || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
-            List<Landmark> cityLandmarks = null;
-            try {
-                cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
+
+            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
 
             LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, mod10);
 
@@ -279,9 +285,17 @@ public class TaxiDataController {
         Map<String, byte[]> fileNameAndContent = new HashMap<>();
         List<StringBuilder> arffStringWithoutHeader = new ArrayList<>();
 
+        List<Landmark> cityLandmarks = null;
+        try {
+            cityLandmarks = CityReader.readCityWktAndGetLandmarks();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         int notMod = 0;
         List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
         ForkJoinPool forkJoinPool = new ForkJoinPool(20);
+        List<Landmark> finalCityLandmarks = cityLandmarks;
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<List<TaxiData>> taxiDataList = null;
             try {
@@ -292,7 +306,8 @@ public class TaxiDataController {
 
             AtomicInteger day = new AtomicInteger(1);
             taxiDataList.forEach(taxiData -> {
-                List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+                //List<String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+                Map<Long, TaxiData> taxiDataPositions = taxiData.stream().collect(Collectors.toMap(TaxiData::getId, taxiDatax->taxiDatax));
 
                 LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
                 lineStringParser.parse();
@@ -303,13 +318,8 @@ public class TaxiDataController {
                         || landmark.getLatitude() < MapHelper.MIN_LATITUDE
                         || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
 
-                List<Landmark> cityLandmarks = null;
-                try {
-                    cityLandmarks = CityReader.readCityWktAndGetLandmarks();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), cityLandmarks);
+
+                Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
 
                 LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, notMod);
 
@@ -329,6 +339,59 @@ public class TaxiDataController {
         String zipName = new StringBuilder()
                 .append(limit).append("taxi-month")
                 .append(month).append("-training.zip").toString();
+        return ResponseEntityHelper.getZipResponeEntity(fileNameAndContent, month, limit, zipName);
+    }
+
+    @GetMapping(path = "month/{month}/day1/taxi/{limit}/timedata/download")
+    public ResponseEntity<ByteArrayResource> getMonthlyTimeDataByForTop(@PathVariable("month") int month, @PathVariable("limit") long limit) throws IOException {
+        List<TaxiDataCountDto> topTaxis = taxiDataService.getMonthTopTaxisByLimit(month, limit);
+        Map<String, byte[]> fileNameAndContent = new HashMap<>();
+        Map<Long, Long> meanSpeedByTaxi = new HashMap<>();
+        List<String> aggregatedLineStrings = new ArrayList<>();
+
+        List<Landmark> cityLandmarks = null;
+        try {
+            cityLandmarks = CityReader.readCityWktAndGetLandmarks();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        ForkJoinPool forkJoinPool = new ForkJoinPool(20);
+        int mod = 0;
+        List<Landmark> finalCityLandmarks = cityLandmarks;
+        forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
+            List<TaxiData> taxiData = taxiDataService.getMonthlyDay1DataByTaxiIdAndMonth(taxi.getTaxiId(), month);
+            long meanSpeed = Math.round(taxiData.stream().map(TaxiData::getSpeed).mapToDouble(speed -> speed).average().getAsDouble());
+            meanSpeedByTaxi.put(taxiData.get(0).getTaxiId(), meanSpeed);
+            //HashMap<Timestamp, String> taxiDataPositions = taxiData.stream().flatMap(p -> Stream.of(p.getPosition())).collect(Collectors.toList());
+            Map<Long, TaxiData> taxiDataPositions = taxiData.stream().collect(Collectors.toMap(TaxiData::getId, taxiDatax->taxiDatax));
+
+            LineStringParser lineStringParser = new LineStringParser(taxiDataPositions);
+            lineStringParser.parse();
+
+            List<Landmark> landmarks = CoordinateTrasformator.transformCoordinates(lineStringParser.getLandmarks());
+            landmarks.removeAll(landmarks.stream().filter(landmark -> landmark.getLongitude() < MapHelper.MIN_LONGITUDE
+                    || landmark.getLongitude() > MapHelper.MAX_LONGITUDE
+                    || landmark.getLatitude() < MapHelper.MIN_LATITUDE
+                    || landmark.getLatitude() > MapHelper.MAX_LATITUDE).collect(Collectors.toList()));
+
+
+            Landmark closestLandmark = ClosestPositionCalculator.calculate(landmarks.get(0), finalCityLandmarks);
+
+            LineStringWriter lineStringWriter = new LineStringWriter(landmarks, closestLandmark, mod);
+
+            String lineString = lineStringWriter.writeWithTimeData();
+            aggregatedLineStrings.add(lineString);
+            byte[] data = lineString.getBytes();
+            fileNameAndContent.put("taxi-" + taxi.getTaxiId() + ".wkt", data);
+
+        })).join();
+
+        fileNameAndContent.put("settings.txt", TaxiDataHelper.getSimulationSettingsForTaxi(topTaxis, meanSpeedByTaxi).getBytes());
+        fileNameAndContent.put("allLineStrings.txt", aggregatedLineStrings.stream().collect(Collectors.joining(System.lineSeparator())).getBytes());
+        String zipName = new StringBuilder()
+                .append(limit).append("taxi-month")
+                .append(month).append("-simulation.zip").toString();
         return ResponseEntityHelper.getZipResponeEntity(fileNameAndContent, month, limit, zipName);
     }
 

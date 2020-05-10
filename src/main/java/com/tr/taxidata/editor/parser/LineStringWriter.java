@@ -1,7 +1,10 @@
 package com.tr.taxidata.editor.parser;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class LineStringWriter {
@@ -65,6 +68,34 @@ public class LineStringWriter {
 
         stringBuilder.append(")");
         //System.out.println(stringBuilder.toString());
+        return stringBuilder.toString();
+    }
+
+    public String writeWithTimeData() {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        stringBuilder.append(this.closestLandmark.getLongitude())
+                .append(",")
+                .append(this.closestLandmark.getLatitude())
+                .append(",")
+                .append(0)
+                .append(System.lineSeparator());
+
+
+        List<Landmark> orderedLandmarks = this.landmarks.stream()
+                .sorted(Comparator.comparing(Landmark::getDate))
+                .collect(Collectors.toList());
+
+        IntStream.range(0, orderedLandmarks.size()).forEach(index -> {
+            if (moduloFactor == 0 || (index % moduloFactor == 0)) {
+                stringBuilder.append(orderedLandmarks.get(index).getLongitude())
+                        .append(",")
+                        .append(orderedLandmarks.get(index).getLatitude())
+                        .append(",")
+                        .append(orderedLandmarks.get(index).getDate())
+                        .append(System.lineSeparator());
+            }
+        });
         return stringBuilder.toString();
     }
 

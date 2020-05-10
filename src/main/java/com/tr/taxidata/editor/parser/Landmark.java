@@ -1,11 +1,14 @@
 package com.tr.taxidata.editor.parser;
 
+import java.sql.Timestamp;
+
 public class Landmark {
     long id = 0;
     double latitude = 0;
     double longitude = 0;
     double x = 0;
     double y = 0;
+    private Timestamp date;
 
     public long getId() {
         return id;
@@ -45,6 +48,14 @@ public class Landmark {
 
     public void setY(double y) {
         this.y = y;
+    }
+
+    public Timestamp getDate() {
+        return date;
+    }
+
+    public void setDate(Timestamp date) {
+        this.date = date;
     }
 
     @Override
