@@ -14,7 +14,7 @@ public interface TaxiDataRepository extends JpaRepository<TaxiData, Long> {
 
     Optional<TaxiData> getById(Long id);
 
-    @Query(value = "select * from public.bursa_taxi_data_month1 tdmv where tdmv.taxi_id=?1 and tdmv.date>'2019-01-01 00:00:00' and tdmv.date<'2019-01-02 00:00:00' order by \"date\" asc", nativeQuery = true)
+    @Query(value = "select *, (extract(hour from date) * 60 * 60 + extract(minute from date) * 60 + extract(second from date) ) as timeInSecond from public.bursa_taxi_data_month1 tdmv where tdmv.taxi_id=?1 and tdmv.date>'2019-01-01 00:00:00' and tdmv.date<'2019-01-02 00:00:00' order by \"date\" asc", nativeQuery = true)
     List<TaxiData> getMonth1Day1DataByTaxiId(Long id);
 
     /*@Query(value = "select * from public.bursa_taxi_data_month2 tdmv where tdmv.taxi_id=?1 and tdmv.date>'2019-01-01 00:00:00' and tdmv.date<'2019-01-02 00:00:00' order by \"date\" asc", nativeQuery = true)
