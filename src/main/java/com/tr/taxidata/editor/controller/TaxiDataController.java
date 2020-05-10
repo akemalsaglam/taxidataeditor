@@ -233,7 +233,7 @@ public class TaxiDataController {
         List<String> aggregatedLineStrings = new ArrayList<>();
 
         ForkJoinPool forkJoinPool = new ForkJoinPool(20);
-        int mod10 = 10;
+        int mod10 = 0;
         forkJoinPool.submit(() -> topTaxis.parallelStream().forEach(taxi -> {
             List<TaxiData> taxiData = taxiDataService.getMonthlyDay1DataByTaxiIdAndMonth(taxi.getTaxiId(), month);
             long meanSpeed = Math.round(taxiData.stream().map(TaxiData::getSpeed).mapToDouble(speed -> speed).average().getAsDouble());
